@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    container_name: coffelist-db
+    environment:
+      POSTGRES_DB: coffelist
+      POSTGRES_USER: coffeeadmin
+      POSTGRES_PASSWORD: coffeepass123
+    ports:
+      - "5432:5432"
+    volumes:
+      # This is the volume that persists data!
+      - postgres_data:/var/lib/postgresql/data
+      # Initialize database with our schema
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coffeeadmin -d coffelist"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Express API
+  api:
+    build: .
+    container_name: coffelist-api
+    ports:
+      - "3000:3000"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: coffelist
+      DB_USER: coffeeadmin
+      DB_PASSWORD: coffeepass123
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      # Mount code for hot-reloading during development
+      - ./server.js:/app/server.js
+
+# Named volumes - this is where data persists!
+volumes:
+  postgres_data:
