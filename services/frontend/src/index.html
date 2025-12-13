@@ -1,0 +1,69 @@
+<!-- Frontend Service - Main HTML -->
+<!-- Location: services/frontend/src/index.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coffelist - Find Local Roasteries</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>☕ Coffelist</h1>
+        <p>Discover local coffee roasteries</p>
+        <p class="architecture-note">Microservices Architecture: Frontend (nginx) + API (Express) + Database (PostgreSQL)</p>
+    </header>
+
+    <main>
+        <div class="container">
+            <!-- Roasteries Section -->
+            <section class="section">
+                <h2>Coffee Roasteries</h2>
+                
+                <div class="form-card">
+                    <h3>Add New Roastery</h3>
+                    <form id="roastery-form">
+                        <input type="text" id="roastery-name" placeholder="Roastery Name" required>
+                        <input type="text" id="roastery-location" placeholder="Location" required>
+                        <textarea id="roastery-description" placeholder="Description (optional)" rows="3"></textarea>
+                        <select id="roastery-owner">
+                            <option value="">No owner</option>
+                        </select>
+                        <button type="submit">Add Roastery</button>
+                    </form>
+                </div>
+
+                <div id="roasteries-list" class="list">
+                    <p class="loading">Loading roasteries...</p>
+                </div>
+            </section>
+
+            <!-- Users Section -->
+            <section class="section">
+                <h2>Users</h2>
+                
+                <div class="form-card">
+                    <h3>Add New User</h3>
+                    <form id="user-form">
+                        <input type="text" id="user-username" placeholder="Username" required>
+                        <input type="email" id="user-email" placeholder="Email" required>
+                        <button type="submit">Add User</button>
+                    </form>
+                </div>
+
+                <div id="users-list" class="list">
+                    <p class="loading">Loading users...</p>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer>
+        <p>Built with Docker microservices: nginx (frontend) + Express (API) + PostgreSQL (database)</p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>

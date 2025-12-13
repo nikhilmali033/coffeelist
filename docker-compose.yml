@@ -1,30 +1,20 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database
-  postgres:
-    image: postgres:15
-    container_name: coffelist-db
-    environment:
-      POSTGRES_DB: coffelist
-      POSTGRES_USER: coffeeadmin
-      POSTGRES_PASSWORD: coffeepass123
+  # Frontend Service - nginx serving static files
+  frontend:
+    build: ./services/frontend
+    container_name: coffelist-frontend
     ports:
-      - "5432:5432"
-    volumes:
-      # This is the volume that persists data!
-      - postgres_data:/var/lib/postgresql/data
-      # Initialize database with our schema
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U coffeeadmin -d coffelist"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - "8080:80"
+    depends_on:
+      - api
+    networks:
+      - coffelist-network
 
-  # Express API
+  # API Service - Express backend
   api:
-    build: .
+    build: ./services/api
     container_name: coffelist-api
     ports:
       - "3000:3000"
@@ -38,9 +28,39 @@ services:
       postgres:
         condition: service_healthy
     volumes:
-      # Mount code for hot-reloading during development
-      - ./server.js:/app/server.js
+      # Mount source for development (optional - comment out for production)
+      - ./services/api/src:/app/src
+    networks:
+      - coffelist-network
 
-# Named volumes - this is where data persists!
+  # Database Service - PostgreSQL
+  postgres:
+    image: postgres:15
+    container_name: coffelist-db
+    environment:
+      POSTGRES_DB: coffelist
+      POSTGRES_USER: coffeeadmin
+      POSTGRES_PASSWORD: coffeepass123
+    ports:
+      - "5432:5432"
+    volumes:
+      # Persistent data storage
+      - postgres_data:/var/lib/postgresql/data
+      # Initialize database with schema
+      - ./services/database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coffeeadmin -d coffelist"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - coffelist-network
+
+# Networks - allows containers to communicate
+networks:
+  coffelist-network:
+    driver: bridge
+
+# Volumes - persistent storage
 volumes:
   postgres_data:
