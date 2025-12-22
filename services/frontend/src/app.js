@@ -1,12 +1,263 @@
-// Frontend Service - JavaScript
+// Frontend Service - JavaScript with Authentication
 // Location: services/frontend/src/app.js
 
-// API base URL - Express backend service
+// API base URLs
 const API_URL = 'http://localhost:3000';
+const AUTH_URL = 'http://localhost:4000';
+
+// SimpleWebAuthn functions from CDN
+const { startRegistration, startAuthentication } = SimpleWebAuthnBrowser;
 
 // State
 let users = [];
 let roasteries = [];
+let currentUser = null;
+
+// ============== AUTHENTICATION ==============
+
+// Check if user is already logged in
+async function checkSession() {
+    try {
+        const response = await fetch(`${AUTH_URL}/session`, {
+            credentials: 'include'
+        });
+        const data = await response.json();
+        
+        if (data.authenticated) {
+            currentUser = data.user;
+            showMainContent();
+            updateAuthUI();
+        } else {
+            showAuthModal();
+        }
+    } catch (error) {
+        console.error('Session check error:', error);
+        showAuthModal();
+    }
+}
+
+// Show/hide UI elements based on auth state
+function showAuthModal() {
+    document.getElementById('auth-modal').style.display = 'flex';
+    document.getElementById('main-content').style.display = 'none';
+}
+
+function showMainContent() {
+    document.getElementById('auth-modal').style.display = 'none';
+    document.getElementById('main-content').style.display = 'block';
+}
+
+function updateAuthUI() {
+    if (currentUser) {
+        document.getElementById('user-info').textContent = `👤 ${currentUser.username}`;
+        document.getElementById('logout-btn').style.display = 'block';
+    } else {
+        document.getElementById('user-info').textContent = '';
+        document.getElementById('logout-btn').style.display = 'none';
+    }
+}
+
+// Show auth message
+function showAuthMessage(message, type = 'error') {
+    const messageDiv = document.getElementById('auth-message');
+    messageDiv.textContent = message;
+    messageDiv.className = type;
+    messageDiv.style.display = 'block';
+    
+    setTimeout(() => {
+        messageDiv.style.display = 'none';
+    }, 5000);
+}
+
+// ============== REGISTRATION FLOW ==============
+
+async function registerWithPasskey(username, email) {
+    try {
+        showAuthMessage('Starting registration...', 'info');
+        
+        // Step 1: Get registration options from server
+        const optionsResponse = await fetch(`${AUTH_URL}/register/start`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ username, email })
+        });
+        
+        if (!optionsResponse.ok) {
+            const error = await optionsResponse.json();
+            throw new Error(error.error || 'Registration failed');
+        }
+        
+        const options = await optionsResponse.json();
+        
+        showAuthMessage('Please use your device to create a passkey...', 'info');
+        
+        // Step 2: Use device to create credential
+        let credential;
+        try {
+            credential = await startRegistration(options);
+        } catch (error) {
+            if (error.name === 'NotAllowedError') {
+                throw new Error('Registration cancelled or timed out');
+            }
+            throw error;
+        }
+        
+        showAuthMessage('Verifying your passkey...', 'info');
+        
+        // Step 3: Send credential to server for verification
+        const verifyResponse = await fetch(`${AUTH_URL}/register/verify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ credential })
+        });
+        
+        if (!verifyResponse.ok) {
+            const error = await verifyResponse.json();
+            throw new Error(error.error || 'Verification failed');
+        }
+        
+        const result = await verifyResponse.json();
+        
+        if (result.verified) {
+            showAuthMessage('Registration successful! Welcome!', 'success');
+            currentUser = result.user;
+            setTimeout(() => {
+                showMainContent();
+                updateAuthUI();
+                fetchUsers();
+                fetchRoasteries();
+            }, 1000);
+        }
+    } catch (error) {
+        console.error('Registration error:', error);
+        showAuthMessage(error.message || 'Registration failed', 'error');
+    }
+}
+
+// ============== AUTHENTICATION FLOW ==============
+
+async function loginWithPasskey(username) {
+    try {
+        showAuthMessage('Starting login...', 'info');
+        
+        // Step 1: Get authentication options from server
+        const optionsResponse = await fetch(`${AUTH_URL}/login/start`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ username: username || undefined })
+        });
+        
+        if (!optionsResponse.ok) {
+            const error = await optionsResponse.json();
+            throw new Error(error.error || 'Login failed');
+        }
+        
+        const options = await optionsResponse.json();
+        
+        showAuthMessage('Please authenticate with your device...', 'info');
+        
+        // Step 2: Use device to authenticate
+        let credential;
+        try {
+            credential = await startAuthentication(options);
+        } catch (error) {
+            if (error.name === 'NotAllowedError') {
+                throw new Error('Authentication cancelled or timed out');
+            }
+            throw error;
+        }
+        
+        showAuthMessage('Verifying...', 'info');
+        
+        // Step 3: Send credential to server for verification
+        const verifyResponse = await fetch(`${AUTH_URL}/login/verify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ credential })
+        });
+        
+        if (!verifyResponse.ok) {
+            const error = await verifyResponse.json();
+            throw new Error(error.error || 'Verification failed');
+        }
+        
+        const result = await verifyResponse.json();
+        
+        if (result.verified) {
+            showAuthMessage('Login successful! Welcome back!', 'success');
+            currentUser = result.user;
+            setTimeout(() => {
+                showMainContent();
+                updateAuthUI();
+                fetchUsers();
+                fetchRoasteries();
+            }, 1000);
+        }
+    } catch (error) {
+        console.error('Login error:', error);
+        showAuthMessage(error.message || 'Login failed', 'error');
+    }
+}
+
+// ============== LOGOUT ==============
+
+async function logout() {
+    try {
+        await fetch(`${AUTH_URL}/logout`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+        
+        currentUser = null;
+        updateAuthUI();
+        showAuthModal();
+    } catch (error) {
+        console.error('Logout error:', error);
+    }
+}
+
+// ============== TAB SWITCHING ==============
+
+function setupTabs() {
+    const tabs = document.querySelectorAll('.tab');
+    const tabContents = document.querySelectorAll('.tab-content');
+    
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            // Remove active class from all tabs and contents
+            tabs.forEach(t => t.classList.remove('active'));
+            tabContents.forEach(c => c.classList.remove('active'));
+            
+            // Add active class to clicked tab and corresponding content
+            tab.classList.add('active');
+            const tabName = tab.getAttribute('data-tab');
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+        });
+    });
+}
+
+// ============== FORM HANDLERS ==============
+
+document.getElementById('register-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const username = document.getElementById('register-username').value.trim();
+    const email = document.getElementById('register-email').value.trim();
+    await registerWithPasskey(username, email);
+});
+
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const username = document.getElementById('login-username').value.trim();
+    await loginWithPasskey(username);
+});
+
+document.getElementById('logout-btn').addEventListener('click', logout);
+
+// ============== EXISTING FUNCTIONALITY ==============
 
 // Helper function to format dates
 function formatDate(dateString) {
@@ -29,8 +280,7 @@ function showMessage(elementId, message, type = 'error') {
     setTimeout(() => messageDiv.remove(), 5000);
 }
 
-// ============== FETCH DATA ==============
-
+// Fetch data
 async function fetchRoasteries() {
     try {
         const response = await fetch(`${API_URL}/roasteries`);
@@ -58,8 +308,7 @@ async function fetchUsers() {
     }
 }
 
-// ============== RENDER DATA ==============
-
+// Render data
 function renderRoasteries() {
     const container = document.getElementById('roasteries-list');
     
@@ -86,7 +335,7 @@ function renderUsers() {
     const container = document.getElementById('users-list');
     
     if (users.length === 0) {
-        container.innerHTML = '<p class="loading">No users yet. Add one above!</p>';
+        container.innerHTML = '<p class="loading">No users yet.</p>';
         return;
     }
     
@@ -114,8 +363,7 @@ function updateOwnerDropdown() {
     });
 }
 
-// ============== CREATE DATA ==============
-
+// Create data
 async function createRoastery(name, location, description, ownerId) {
     try {
         const response = await fetch(`${API_URL}/roasteries`, {
@@ -136,7 +384,7 @@ async function createRoastery(name, location, description, ownerId) {
             throw new Error(error.error || 'Failed to create roastery');
         }
         
-        await fetchRoasteries(); // Refresh the list
+        await fetchRoasteries();
         showMessage('roasteries-list', 'Roastery added successfully!', 'success');
         return true;
     } catch (error) {
@@ -145,33 +393,6 @@ async function createRoastery(name, location, description, ownerId) {
         return false;
     }
 }
-
-async function createUser(username, email) {
-    try {
-        const response = await fetch(`${API_URL}/users`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ username, email })
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to create user');
-        }
-        
-        await fetchUsers(); // Refresh the list
-        showMessage('users-list', 'User added successfully!', 'success');
-        return true;
-    } catch (error) {
-        console.error('Error creating user:', error);
-        showMessage('users-list', error.message);
-        return false;
-    }
-}
-
-// ============== FORM HANDLERS ==============
 
 document.getElementById('roastery-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -184,32 +405,17 @@ document.getElementById('roastery-form').addEventListener('submit', async (e) =>
     const success = await createRoastery(name, location, description, ownerId);
     
     if (success) {
-        // Clear form
-        e.target.reset();
-    }
-});
-
-document.getElementById('user-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const username = document.getElementById('user-username').value.trim();
-    const email = document.getElementById('user-email').value.trim();
-    
-    const success = await createUser(username, email);
-    
-    if (success) {
-        // Clear form
         e.target.reset();
     }
 });
 
 // ============== INITIALIZATION ==============
 
-// Load data when page loads
 window.addEventListener('DOMContentLoaded', () => {
     console.log('Coffelist Frontend Service loaded!');
     console.log('Connecting to API Service at:', API_URL);
+    console.log('Connecting to Auth Service at:', AUTH_URL);
     
-    fetchUsers();
-    fetchRoasteries();
+    setupTabs();
+    checkSession();
 });

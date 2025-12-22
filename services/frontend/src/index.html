@@ -1,4 +1,4 @@
-<!-- Frontend Service - Main HTML -->
+<!-- Frontend Service - Main HTML with Authentication -->
 <!-- Location: services/frontend/src/index.html -->
 
 <!DOCTYPE html>
@@ -8,15 +8,54 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Coffelist - Find Local Roasteries</title>
     <link rel="stylesheet" href="style.css">
+    <!-- SimpleWebAuthn Browser Library -->
+    <script src="https://unpkg.com/@simplewebauthn/browser@9.0.1/dist/bundle/index.umd.min.js"></script>
 </head>
 <body>
     <header>
         <h1>☕ Coffelist</h1>
         <p>Discover local coffee roasteries</p>
-        <p class="architecture-note">Microservices Architecture: Frontend (nginx) + API (Express) + Database (PostgreSQL)</p>
+        <div id="auth-status" class="auth-status">
+            <span id="user-info"></span>
+            <button id="logout-btn" style="display: none;">Logout</button>
+        </div>
     </header>
 
-    <main>
+    <!-- Authentication Modal -->
+    <div id="auth-modal" class="modal">
+        <div class="modal-content">
+            <h2>Welcome to Coffelist</h2>
+            <p class="modal-subtitle">Sign in with a passkey (no password needed!)</p>
+            
+            <div id="auth-tabs" class="tabs">
+                <button class="tab active" data-tab="login">Login</button>
+                <button class="tab" data-tab="register">Register</button>
+            </div>
+
+            <!-- Login Tab -->
+            <div id="login-tab" class="tab-content active">
+                <form id="login-form">
+                    <input type="text" id="login-username" placeholder="Username (optional)" autocomplete="username webauthn">
+                    <button type="submit" class="primary-btn">🔐 Login with Passkey</button>
+                </form>
+                <p class="hint">Leave username blank to use device-stored credentials</p>
+            </div>
+
+            <!-- Register Tab -->
+            <div id="register-tab" class="tab-content">
+                <form id="register-form">
+                    <input type="text" id="register-username" placeholder="Username" required autocomplete="username">
+                    <input type="email" id="register-email" placeholder="Email" required autocomplete="email">
+                    <button type="submit" class="primary-btn">🎉 Create Account with Passkey</button>
+                </form>
+                <p class="hint">You'll use your device (Face ID, fingerprint, etc.) instead of a password</p>
+            </div>
+
+            <div id="auth-message"></div>
+        </div>
+    </div>
+
+    <main id="main-content" style="display: none;">
         <div class="container">
             <!-- Roasteries Section -->
             <section class="section">
@@ -44,15 +83,6 @@
             <section class="section">
                 <h2>Users</h2>
                 
-                <div class="form-card">
-                    <h3>Add New User</h3>
-                    <form id="user-form">
-                        <input type="text" id="user-username" placeholder="Username" required>
-                        <input type="email" id="user-email" placeholder="Email" required>
-                        <button type="submit">Add User</button>
-                    </form>
-                </div>
-
                 <div id="users-list" class="list">
                     <p class="loading">Loading users...</p>
                 </div>
@@ -61,7 +91,7 @@
     </main>
 
     <footer>
-        <p>Built with Docker microservices: nginx (frontend) + Express (API) + PostgreSQL (database)</p>
+        <p>Built with Docker microservices: nginx (frontend) + Express (API) + Auth Service + PostgreSQL (database)</p>
     </footer>
 
     <script src="app.js"></script>

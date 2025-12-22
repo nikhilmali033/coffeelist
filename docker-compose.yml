@@ -9,6 +9,7 @@ services:
       - "8080:80"
     depends_on:
       - api
+      - auth
     networks:
       - coffelist-network
 
@@ -30,6 +31,28 @@ services:
     volumes:
       # Mount source for development (optional - comment out for production)
       - ./services/api/src:/app/src
+    networks:
+      - coffelist-network
+
+  # Auth Service - Passkey/WebAuthn authentication
+  auth:
+    build: ./services/auth
+    container_name: coffelist-auth
+    ports:
+      - "4000:4000"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: coffelist
+      DB_USER: coffeeadmin
+      DB_PASSWORD: coffeepass123
+      SESSION_SECRET: coffelist-secret-change-in-production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      # Mount source for development (optional - comment out for production)
+      - ./services/auth/src:/app/src
     networks:
       - coffelist-network
 
